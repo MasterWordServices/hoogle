@@ -18,8 +18,8 @@ bug-reports:        https://github.com/ndmitchell/hoogle/issues
 tested-with:        GHC==9.8, GHC==9.6, GHC==9.4
 extra-doc-files:
     README.md
-    CHANGES.txt
 extra-source-files:
+    CHANGES.txt
     cbits/*.h
     cbits/*.c
 data-files:
