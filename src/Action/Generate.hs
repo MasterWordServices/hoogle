@@ -152,6 +152,20 @@ readHaskellDirs timing settings dirs = do
         sets = map setFromDir $ filter (`isPrefixOf` file) dirs
         setFromDir dir = (strPack "set", strPack $ takeFileName $ dropTrailingPathSeparator dir)
 
+readHaskellHaddockProject :: Timing -> Settings -> FilePath -> IO (Map.Map PkgName Package, Set.Set PkgName, ConduitT () (PkgName, URL, LBStr) IO ())
+readHaskellHaddockProject timing settings baseDir = do
+    files <- listFilesRecursive baseDir
+    let packages = map (strPack . takeBaseName &&& id) $ filter ((==) ".txt" . takeExtension) files
+    let source = forM_ packages $ \(name, file) -> do
+            src <- liftIO $ bstrReadFile file
+            let relDir = makeRelative baseDir (takeDirectory file)
+                url = replace "\\" "/" relDir ++ "/"
+            yield (name, url, lbstrFromChunks [src])
+    pure (Map.fromList $ map generateBarePackage packages ,Set.fromList $ map fst packages, source)
+  where
+    generateBarePackage (name, _) =
+        (name, mempty{packageTags = [(strPack "set", strPack "all")]})
+
 readFregeOnline :: Timing -> Download -> IO (Map.Map PkgName Package, Set.Set PkgName, ConduitT () (PkgName, URL, LBStr) IO ())
 readFregeOnline timing download = do
     frege <- download "frege-frege.txt" "http://try.frege-lang.org/hoogle-frege.txt"
@@ -238,6 +252,9 @@ actionGenerate g@Generate{..} = withTiming (if debug then Just $ replaceExtensio
                     warnFlagIgnored "--haddock" "set" (local_ /= []) "--local"
                     warnFlagIgnored "--haddock" "set" (isJust download) "--download"
                     readHaskellHaddock timing settings dir
+                | Just dir <- haddock_project -> do
+                    -- TODO flag warnings
+                    readHaskellHaddockProject timing settings dir
                 | [""] <- local_ -> do
                     warnFlagIgnored "--local" "used as flag (no paths)" (isJust download) "--download"
                     readHaskellGhcpkg timing settings
